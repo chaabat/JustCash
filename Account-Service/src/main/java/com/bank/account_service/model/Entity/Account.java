@@ -25,7 +25,7 @@ import lombok.Data;
 @Entity
 @Table(name = "accounts")
 public class Account {
-    @Id 
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(name = "solde", nullable = false)

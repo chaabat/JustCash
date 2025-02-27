@@ -20,14 +20,16 @@ import com.bank.customer_service.service.CustomerService;
  */
 @Service
 public class CustomerServiceImpl implements CustomerService {
-    @Autowired 
+    @Autowired
     private CustomerRepository customerRepository;
     @Autowired
     private CustomerMapper customerMapper;
 
     /*
      * Crée un nouveau client
+     * 
      * @param request
+     * 
      * @return CustomerResponse
      */
     @Override
@@ -39,9 +41,12 @@ public class CustomerServiceImpl implements CustomerService {
         Customer savedCustomer = customerRepository.save(customer);
         return customerMapper.toResponse(savedCustomer);
     }
+
     /*
      * Récupère tous les clients avec pagination
+     * 
      * @param pageable
+     * 
      * @return Page<CustomerResponse>
      */
     @Override
@@ -52,19 +57,52 @@ public class CustomerServiceImpl implements CustomerService {
         }
         return customers.map(customerMapper::toResponse);
     }
+
     /*
      * Récupère un client par son ID
+     * 
      * @param id
+     * 
      * @return CustomerResponse
      */
     @Override
     public CustomerResponse getCustomerById(Long id) {
         Customer customer = customerRepository.findById(id)
-        .orElseThrow(() -> new CustomerNotFoundException("Customer not found with id: " + id));
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found with id: " + id));
         return customerMapper.toResponse(customer);
     }
+
+    /*
+     * Met à jour un client
+     * 
+     * @param id
+     * 
+     * @param request
+     * 
+     * @return CustomerResponse
+     */
+    @Override
+    public CustomerResponse updateCustomer(Long id, CustomerRequest request) {
+        Customer existingCustomer = customerRepository.findById(id)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found with id: " + id));
+
+        // Vérifier si l'email est déjà utilisé par un autre client
+        if (!existingCustomer.getEmail().equals(request.getEmail()) &&
+                customerRepository.existsByEmail(request.getEmail())) {
+            throw CustomerAlreadyExistsException.withEmail(request.getEmail());
+        }
+
+        existingCustomer.setName(request.getName());
+        existingCustomer.setEmail(request.getEmail());
+        existingCustomer.setAddress(request.getAddress());
+
+        Customer updatedCustomer = customerRepository.save(existingCustomer);
+        return customerMapper.toResponse(updatedCustomer);
+    }
+
     /*
      * Supprime un client par son ID
+     * 
      * @param id
      */
     @Override
@@ -75,9 +113,18 @@ public class CustomerServiceImpl implements CustomerService {
         // delete all accounts of the client by using rest template
         RestTemplate restTemplate = new RestTemplate();
         String url = "http://localhost:8080/account-service/api/accounts/delete-by-client-id/" + id;
-        
-            restTemplate.delete(url);
-            customerRepository.deleteById(id);
-       
+
+        restTemplate.delete(url);
+        customerRepository.deleteById(id);
+
+    }
+
+    @Override
+    public Page<CustomerResponse> searchCustomersByName(String name, Pageable pageable) {
+        Page<Customer> customers = customerRepository.findByNameContainingIgnoreCase(name, pageable);
+        if (customers.isEmpty()) {
+            throw new CustomerNotFoundException("No customers found with name containing: " + name);
+        }
+        return customers.map(customerMapper::toResponse);
     }
 }
